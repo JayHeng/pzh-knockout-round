@@ -28,6 +28,7 @@ class knockoutMain(win.knockoutWin):
             self.exeTopRoot = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self.playersFilename = os.path.join(self.exeTopRoot, 'bin', 'players.json')
         self._loadExistingPlayers()
+        self.byersFilename = os.path.join(self.exeTopRoot, 'bin', 'byers.json')
         self._createRemainingPlayers()
         self._showRemainingPlayers()
 
@@ -42,6 +43,14 @@ class knockoutMain(win.knockoutWin):
                 playerDict = json.load(fileObj)
                 var.setPlayer(playerDict)
                 fileObj.close()
+
+    def _reloadExistingByers(self):
+        byerDict = {'byer1':None}
+        if os.path.isfile(self.byersFilename):
+            with open(self.byersFilename, 'r') as fileObj:
+                byerDict = json.load(fileObj)
+                fileObj.close()
+        return byerDict
 
     def _showRemainingPlayers(self):
         global g_tmpPlayerDict
@@ -202,7 +211,7 @@ class knockoutMain(win.knockoutWin):
             if (g_tmpPlayerDict[key] != None) and (g_tmpPlayerDict[key].find('nobody') != -1):
                 g_totalNobody += 1
 
-    def _selectFirstRoundPlayer(self, playerLoc, wantNobody ):
+    def _selectFirstRoundPlayer(self, playerLoc, wantNobody, wantBye ):
         global g_totalNobody
         isPlayerFound = False
         while not isPlayerFound:
@@ -219,7 +228,28 @@ class knockoutMain(win.knockoutWin):
                 else:
                     if playerId.find('nobody') != -1:
                         continue
-                isPlayerFound = True
+                if wantBye:
+                    hasBye = False
+                    for i in range(len(self.byerDict)):
+                        if None != self.byerDict['byer'+str(i + 1)]:
+                            hasBye = True
+                            break
+                    if hasBye:
+                        for i in range(len(self.byerDict)):
+                            if playerId == self.byerDict['byer'+str(i + 1)]:
+                                self.byerDict['byer'+str(i + 1)] = None
+                                isPlayerFound = True
+                                break
+                    else:
+                        isPlayerFound = True
+                else:
+                    isPlayerFound = True
+                    for i in range(len(self.byerDict)):
+                        if playerId == self.byerDict['byer'+str(i + 1)]:
+                            isPlayerFound = False
+                            break
+                if not isPlayerFound:
+                    continue
                 self._showFirstRoundPlayer(playerId, playerLoc)
                 g_tmpPlayerDict['player'+str(idx)] = None
                 self._showRemainingPlayers()
@@ -235,13 +265,20 @@ class knockoutMain(win.knockoutWin):
             messageText = ('Less than 8 players')
             wx.MessageBox(messageText, "Error", wx.OK | wx.ICON_INFORMATION)
             return
-        wantNobody = True
+        wantNobody = False
+        wantBye = False
         nobodyIdxList = random.sample(list(range(0,8)), g_totalNobody)
+        self.byerDict = self._reloadExistingByers()
         for i in range(16):
-            wantNobody = False
+            if wantNobody:
+                wantBye = True
+            else:
+                wantBye = False
             if (i % 2 == 0) and ((int(i / 2)) in nobodyIdxList):
                 wantNobody = True
-            self._selectFirstRoundPlayer(i, wantNobody)
+            else:
+                wantNobody = False
+            self._selectFirstRoundPlayer(i, wantNobody, wantBye)
             time.sleep(0.5)
         self._showSecondRoundPlayers()
         self._showOtherRoundPlayers()
